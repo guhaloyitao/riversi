@@ -1,0 +1,233 @@
+% point is a position on the grid where X and Y are coordinates.
+% Y represents the Yth row and X is the Xth column.
+point(X,Y,Board,C):-	nth1(Y,Board,R),
+						nth1(X,R,C).
+% a piece is black or white.
+isPiece(P):- member(P,['b','w']).
+
+% initial board for all games
+initBoard(Grid):- Grid = [[0,0,0,0,0,0,0,0],
+						  [0,0,0,0,0,0,0,0],
+						  [0,0,0,0,0,0,0,0],
+						  [0,0,0,b,w,0,0,0],
+						  [0,0,0,w,b,0,0,0],
+						  [0,0,0,0,0,0,0,0],
+						  [0,0,0,0,0,0,0,0],
+						  [0,0,0,0,0,0,0,0]].
+max(8).
+
+% determine if position X,Y on a grid is a peice
+isPieceAtPos(Grid,X,Y):- point(X,Y,Grid,C), isPiece(C).
+
+% Find the color of a piece at position X,Y on a grid
+getPiece(X,Y,Grid,C):- point(X,Y,Grid,C), isPiece(C).
+
+% replace element at index I with part P in a list.
+replace([_|T],1,P,[P|T]).
+replace([F|T],I,P,[F|R]):- I > 1, I1 is I-1, replace(T,I1,P,R).
+
+% put a piece P at point X,Y on the grid if coordinate X,Y is empty.
+place(X,Y,P,G,New):- nth1(Y,G,Row),
+					 replace(Row,X,P,NewR),
+					 replace(G,Y,NewR,New).
+
+around(X,Y,P,G,L):- aroundUp(X,Y,P,G,[],L1),aroundUpL(X,Y,P,G,L1,L2),aroundUpR(X,Y,P,G,L2,L3),aroundLeft(X,Y,P,G,L3,L4),
+					aroundRight(X,Y,P,G,L4,L5),aroundD(X,Y,P,G,L5,L6),aroundDL(X,Y,P,G,L6,L7),aroundDR(X,Y,P,G,L7,L).
+
+% check up
+aroundUp(X,Y,P,G,L,[D|L]):- Y > 1, Y2 is Y-1, getPiece(X,Y2,G,C), dif(P,C), D = up, \+member(D,L).
+aroundUp(_,_,_,_,L,L).
+% check up and left
+aroundUpL(X,Y,P,G,L,[D|L]):- Y > 1, Y2 is Y-1, X > 1, X2 is X-1, getPiece(X2,Y2,G,C), dif(P,C), D = upLeft, \+member(D,L).
+aroundUpL(_,_,_,_,L,L).
+% check up and right
+aroundUpR(X,Y,P,G,L,[D|L]):- Y > 1, Y2 is Y-1, max(M), X < M, X2 is X+1, getPiece(X2,Y2,G,C), dif(P,C), D = upRight, \+member(D,L).
+aroundUpR(_,_,_,_,L,L).
+% check left
+aroundLeft(X,Y,P,G,L,[D|L]):- X > 1, X2 is X-1, getPiece(X2,Y,G,C), dif(P,C), D = left, \+member(D,L).
+aroundLeft(_,_,_,_,L,L).
+% check right
+aroundRight(X,Y,P,G,L,[D|L]):- max(M), X < M, X2 is X+1, getPiece(X2,Y,G,C), dif(P,C), D = right, \+member(D,L).
+aroundRight(_,_,_,_,L,L).
+% check down
+aroundD(X,Y,P,G,L,[D|L]):- max(M), Y < M, Y2 is Y+1, getPiece(X,Y2,G,C), dif(P,C), D = down, \+member(D,L).
+aroundD(_,_,_,_,L,L).
+% check down and left
+aroundDL(X,Y,P,G,L,[D|L]):- max(M), Y < M, Y2 is Y+1, X > 1, X2 is X-1, getPiece(X2,Y2,G,C), dif(P,C), D = downLeft, \+member(D,L).
+aroundDL(_,_,_,_,L,L).
+% check down and right
+aroundDR(X,Y,P,G,L,[D|L]):- max(M), Y < M, Y2 is Y+1, X < M, X2 is X+1, getPiece(X2,Y2,G,C), dif(P,C), D = downRight, \+member(D,L).
+aroundDR(_,_,_,_,L,L).
+
+% check if piece P is allowed to pe placed at position X,Y and return list of valid directions
+valid(X,Y,P,G,L):- isPiece(P), point(X,Y,G,C), \+isPiece(C), around(X,Y,P,G,L).
+
+% check if all elements in a row are pieces.
+check([],_,_,_).
+check([H|T],X,Y,G):- isPiece(H), X2 is X+1, check(T,X2,Y,G).
+check([H|T],X,Y,G):- \+dif(H,0), valid(X,Y,w,G,L), flip(X,Y,w,G,L,Temp), \+dif(Temp,Grid),
+				valid(X,Y,b,G,L), flip(X,Y,b,G,L,Temp), \+dif(Temp,Grid), X2 is X+1, check(T,X2,Y,G).
+
+% split grid into rows to check if all their elements are pieces.
+noMovesLeft([],_,_).
+noMovesLeft([Row|T],Y,G):- check(Row,1,Y,G), Y2 is Y+1, noMovesLeft(T,Y2,G).
+
+% check if there is a color that matches P separated by the opposite color in a given direction
+pExistsUp(P,X,Y,G):- Y2 is Y-1, point(X,Y2,G,C), \+dif(C,P).
+pExistsUp(P,X,Y,G):- Y > 1, Y2 is Y-1, isPieceAtPos(G,X,Y2), pExistsUp(P,X,Y2,G).
+pExistsUpL(P,X,Y,G):- X2 is X-1, Y2 is Y-1, point(X2,Y2,G,C), \+dif(C,P).
+pExistsUpL(P,X,Y,G):- X > 1, X2 is X-1, Y > 1, Y2 is Y-1, isPieceAtPos(G,X2,Y2), pExistsUpL(P,X2,Y2,G).
+pExistsUpR(P,X,Y,G):- X2 is X+1, Y2 is Y-1, point(X2,Y2,G,C), \+dif(C,P).
+pExistsUpR(P,X,Y,G):- max(MAX), X < MAX, X2 is X+1, Y > 1, Y2 is Y-1, isPieceAtPos(G,X2,Y2), pExistsUpR(P,X2,Y2,G).
+
+pExistsRight(P,X,Y,G):- X2 is X+1, point(X2,Y,G,C), \+dif(C,P).
+pExistsRight(P,X,Y,G):- max(MAX), X < MAX, X2 is X+1, isPieceAtPos(G,X2,Y), pExistsRight(P,X2,Y,G).
+pExistsLeft(P,X,Y,G):- X2 is X-1, point(X2,Y,G,C), \+dif(C,P).
+pExistsLeft(P,X,Y,G):- X > 1, X2 is X-1, isPieceAtPos(G,X2,Y), pExistsLeft(P,X2,Y,G).
+
+pExistsDown(P,X,Y,G):- Y2 is Y+1, point(X,Y2,G,C), \+dif(C,P).
+pExistsDown(P,X,Y,G):- max(MAX), Y < MAX, Y2 is Y+1, isPieceAtPos(G,X,Y2), pExistsDown(P,X,Y2,G).
+pExistsDownL(P,X,Y,G):- X2 is X-1,  Y2 is Y+1, point(X2,Y2,G,C), \+dif(C,P).
+pExistsDownL(P,X,Y,G):- X > 1, X2 is X-1, max(MAX), Y < MAX, Y2 is Y+1, isPieceAtPos(G,X2,Y2), pExistsDownL(P,X2,Y2,G).
+pExistsDownR(P,X,Y,G):- X2 is X+1, Y2 is Y+1, point(X2,Y2,G,C), \+dif(C,P).
+pExistsDownR(P,X,Y,G):- max(MAX), X < MAX, X2 is X+1, Y < MAX, Y2 is Y+1, isPieceAtPos(G,X2,Y2), pExistsDownR(P,X2,Y2,G).
+
+% change pieces to color P in a given direction. This change is already known to be valid.
+switchUp(X,Y,P,G,New):- Y2 is Y-1, point(X,Y2,G,C), dif(C,P), place(X,Y2,P,G,Temp), switchUp(X,Y2,P,Temp,New).
+switchUp(_,_,_,G,G).
+switchUpL(X,Y,P,G,New):- Y2 is Y-1, X2 is X-1, point(X2,Y2,G,C), dif(C,P), place(X2,Y2,P,G,Temp), switchUpL(X2,Y2,P,Temp,New).
+switchUpL(_,_,_,G,G).
+switchUpR(X,Y,P,G,New):- Y2 is Y-1, X2 is X+1, point(X2,Y2,G,C), dif(C,P), place(X2,Y2,P,G,Temp), switchUpR(X2,Y2,P,Temp,New).
+switchUpR(_,_,_,G,G).
+switchLeft(X,Y,P,G,New):- X2 is X-1, point(X2,Y,G,C), dif(C,P), place(X2,Y,P,G,Temp), switchLeft(X2,Y,P,Temp,New).
+switchLeft(_,_,_,G,G).
+switchRight(X,Y,P,G,New):- X2 is X+1, point(X2,Y,G,C), dif(C,P), place(X2,Y,P,G,Temp), switchRight(X2,Y,P,Temp,New).
+switchRight(_,_,_,G,G).
+switchD(X,Y,P,G,New):- Y2 is Y+1, point(X,Y2,G,C), dif(C,P), place(X,Y2,P,G,Temp), switchD(X,Y2,P,Temp,New).
+switchD(_,_,_,G,G).
+switchDL(X,Y,P,G,New):- Y2 is Y+1, X2 is X-1, point(X2,Y2,G,C), dif(C,P), place(X2,Y2,P,G,Temp), switchDL(X2,Y2,P,Temp,New).
+switchDL(_,_,_,G,G).
+switchDR(X,Y,P,G,New):- Y2 is Y+1, X2 is X+1, point(X2,Y2,G,C), dif(C,P), place(X2,Y2,P,G,Temp), switchDR(X2,Y2,P,Temp,New).
+switchDR(_,_,_,G,G).
+
+% change pieces to color P given a list of valid flippable directions
+flip(_,_,_,G,[],G).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,up), pExistsUp(P,X,Y,G), switchUp(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,upLeft), pExistsUpL(P,X,Y,G), switchUpL(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,upRight), pExistsUpR(P,X,Y,G), switchUpR(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,left), pExistsLeft(P,X,Y,G), switchLeft(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,right), pExistsRight(P,X,Y,G), switchRight(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,down), pExistsDown(P,X,Y,G), switchD(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,downLeft), pExistsDownL(P,X,Y,G), switchDL(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[H|T],N):- \+dif(H,downRight), pExistsDownR(P,X,Y,G), switchDR(X,Y,P,G,Temp), flip(X,Y,P,Temp,T,N).
+flip(X,Y,P,G,[_|T],N):- flip(X,Y,P,G,T,N).
+
+% helps the bot find a valid move
+find([],_,_,_,_,0,0).
+find([H|T],X,Y,G,P,XA,YA):- isPiece(H), X2 is X+1, find(T,X2,Y,G,P,XA,YA).
+find([H|T],X,Y,G,P,X,Y):- \+dif(H,0), valid(X,Y,P,G,L), flip(X,Y,P,G,L,Temp), dif(Temp,Grid).
+
+% split grid into rows to find 1st valid move.
+findMove([],_,G,_,0,0):- win(G).
+findMove([Row|T],Y,G,P,XA,YA):- find(Row,1,Y,G,P,0,0), Y2 is Y+1, findMove(T,Y2,G,P,XA,YA).
+findMove([Row|T],Y,G,P,XA,YA):- find(Row,1,Y,G,P,XA,YA).
+
+% scanning from top to bottom and left to right, place a piece opposite to the player's at the first valid position.
+botMove(G,P,New):- findMove(G,1,G,P,XA,YA), move(XA,YA,P,G,New).
+
+move(_,_,_,Grid,_):- noMovesLeft(Grid,1,Grid), win(Grid).
+move(X,Y,Piece,Grid,New):- read_coordinates(X,Y), valid(X,Y,Piece,Grid,L), dif(L,[]), flip(X,Y,Piece,Grid,L,Temp), dif(Temp,Grid),place(X,Y,Piece,Temp,New).
+move(X,Y,Piece,Grid,New):- valid(X,Y,Piece,Grid,L),flip(X,Y,Piece,Grid,L,Temp),\+dif(Temp,Grid), New = 'not a valid move'.
+
+player(X,Y,P,G,N):- initBoard(G), read_coordinates(X,Y), move(X,Y,P,G,Temp), isPiece(P2), dif(P2,P), botMove(Temp,P2,N).
+
+%play(X,Y,Piece,N):- initBoard(G), move(X,Y,Piece,G,N).
+
+win(Grid):-
+is_player(black),
+isGreaterThan(Grid),
+noMovesLeft(R,N,Grid),
+win_message('Black player won!').
+
+win(Grid):-
+is_player(white),
+isGreaterThan1(Grid),
+noMovesLeft(R,N,Grid),
+win_message('White player won!').
+
+is_player(Colour):- member(Colour,[black,white]).
+win_message(MSG):-
+write(MSG).
+
+count_black([],0).
+count_black([H|T],Sum) :-
+    count_black_row(H,X),
+    count_black(T,Sum1),
+    Sum is Sum1 + X.
+
+count_black_row([], 0).
+count_black_row([b|T], N):-
+count_black_row(T,X),
+N is X+1.
+count_black_row([X|T],N) :- X \= b, count_black_row(T,N).
+
+
+count_white([],0).
+count_white([H|T],Sum) :-
+    count_white_row(H,X),
+    count_white(T,Sum1),
+    Sum is Sum1 + X.
+
+count_white_row([],0).
+count_white_row([w|T], N):-
+count_white_row(T,X),
+N is X+1.
+count_white_row([X|T],N) :- X \= w, count_white_row(T,N).
+
+isGreaterThan(Grid):-
+count_white(Grid,R1),
+count_black(Grid,R2),
+R2 > R1.
+
+isGreaterThan1(Grid):-
+count_white(Grid,R1),
+count_black(Grid,R2),
+R1 > R2.
+
+read_coordinates(X,Y) :-
+  write('type the position of move you want to make as coordinates(type each one and hit enter):'),
+  read(X),
+  read(Y).
+
+% display the Row from X = 1
+displayRow(R):- nl,displayBoard(1,R).
+displayRow(_,[]).
+displayRow(X,[W|R]) :-
+    X<9,
+    (W == w -> write('w')),
+    (X == 8 -> nl ;write('|')),
+    X1 is X+1,
+    displayRow(X1,R).
+
+displayRow(X,[B|R]) :-
+   X<9,
+    (   B == b -> write('b')),
+    (X == 8 -> nl;write('|')),
+    X1 is X+1,
+    displayRow(X1,R).
+
+displayRow(X,[O|R]) :-
+    X<9,
+    (   O == 0 -> write('0')),
+    (X == 8 -> nl ; write('|')),
+    X1 is X+1,
+    displayRow(X1,R).
+
+%display the Board from Y = 1
+displayBoard(G):- nl,displayRow(1,G).
+displayBoard(_,[]).
+displayBoard(Y,[R|G]):-
+    Y<9,
+    displayRow(1,R),
+    Y1 is Y+1,
+    displayBoard(Y1,G).
